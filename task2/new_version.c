@@ -74,7 +74,7 @@ int main(int argc, char** argv, char ** envp) {
     if (rank == 0) {
         starttime = MPI_Wtime();
     }
-    for (timetick; timetick < timebound; timetick++) {
+    for (timetick; timetick*thau <= T; timetick++) {
         if (numtasks != 1) { 
             if (rank == 0) {
                 MPI_Send(&u0[netsize-2], 1, MPI_DOUBLE, rank+1, TAG, MPI_COMM_WORLD);
