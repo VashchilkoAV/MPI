@@ -21,11 +21,12 @@ double calc(double u0, double u1, double u2) {
 
 int main(int argc, char** argv, char ** envp) {
     //collecting params
-    unsigned long long NumSections = 0, T = 0;
+    unsigned long long NumSections = 0;
+    double T = 0.;
     char * pEnd;
     if (argc > 2) {
         NumSections = strtoull(argv[1], &pEnd, 10);
-        T = strtoull(argv[2], &pEnd, 10);
+        T = strtod(argv[2], &pEnd);
     } else {
         printf("Not enough parameters provided\n");
         return 1;
@@ -74,7 +75,7 @@ int main(int argc, char** argv, char ** envp) {
     if (rank == 0) {
         starttime = MPI_Wtime();
     }
-    for (timetick; timetick*thau <= T; timetick++) {
+    for (timetick; timetick*thau < T; timetick++) {
         if (numtasks != 1) { 
             if (rank == 0) {
                 MPI_Send(&u0[netsize-2], 1, MPI_DOUBLE, rank+1, TAG, MPI_COMM_WORLD);

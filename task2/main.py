@@ -44,14 +44,14 @@ JOB_TEMPLATE = "#!/bin/bash\n" \
 RESULT = []
 
 
-def create_job(nodes=7, ppn=4, np= 1, executable="task", N=10000, T = 1):
+def create_job(nodes=7, ppn=4, np= 1, executable="task", N=100000, T = 0.000001):
     with open("job.sh", "w") as job:
         job.write(JOB_TEMPLATE.format(nodes=nodes, ppn=ppn, executable=COMPILED_FILE_NAME, np=np, args=str(N)+" "+str(T)))
     file_cpy(os.getcwd() + "/" + "job.sh")
     os.remove("job.sh")
 
 
-def create_and_run_job(nodes=7, ppn=4, np=1, N=10000, T = 1):
+def create_and_run_job(nodes=7, ppn=4, np=1, N=100000, T = 0.000001):
     create_job(nodes, ppn, np, N=N, T=T)
     stdin, stdout, stderr = client.exec_command("qsub job.sh")
     stdin.close()
@@ -86,7 +86,7 @@ if __name__ == '__main__':
     compile("task1.c", COMPILED_FILE_NAME)
 
     for np in range(1, 29):
-        r = (np, create_and_run_job(7,4, np, 600, 1))
+        r = (np, create_and_run_job(7,4, np, 100000, 0.000001))
         #print(r)
         RESULT.append(r)
     for i in RESULT:
