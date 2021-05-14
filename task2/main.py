@@ -86,7 +86,7 @@ if __name__ == '__main__':
     compile("task1.c", COMPILED_FILE_NAME)
 
     for np in range(1, 29):
-        r = (np, create_and_run_job(7,4, np, 100000, 0.000001))
+        r = (np, create_and_run_job(7,4, np, 150000, 0.000001))
         #print(r)
         RESULT.append(r)
     for i in RESULT:
