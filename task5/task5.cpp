@@ -68,7 +68,7 @@ size_t countDigits(size_t n) {
 
 std::string operator*(const std::string& s, unsigned int n) {
    std::stringstream out;
-    while (n--)
+    for (unsigned i = 0; i < n; i++)
         out << s;
     return out.str();
 }
@@ -94,8 +94,7 @@ int main(int argc, char** argv) {
 
     
 
-    if ((!first.is_open()) || (!second.is_open()) ||
-            (!result.is_open())) {
+    if ((!first.is_open()) || (!second.is_open()) || (!result.is_open())) {
         std::cout << ("Error opening files\n");
         return 1;
     }
@@ -106,8 +105,8 @@ int main(int argc, char** argv) {
     std::getline(first, first_string);
     std::getline(second, second_string);
 
-    Number first_number = convertToNumber(first_string);
-    Number second_number = convertToNumber(second_string);
+    Number first_number = convertToNumber(first_string*10000);
+    Number second_number = convertToNumber(second_string*1000);
 
     MPI_Barrier(MPI_COMM_WORLD);
     size_t N = first_number.size() > second_number.size() ?
@@ -131,29 +130,26 @@ int main(int argc, char** argv) {
     Number without_overflow(right_index - left_index);
 
 
-    int with = summarize(&with_overflow, first_number, second_number,
-        left_index, right_index, 1);
-    int without = summarize(&without_overflow, first_number, second_number,
-        left_index, right_index, 0);
+    int with = summarize(&with_overflow, first_number, second_number, left_index, right_index, 1);
+    int without = summarize(&without_overflow, first_number, second_number, left_index, right_index, 0);
     
 
     if (rank != 0) {
-        MPI_Recv(&overflow, 1, MPI_INT, rank - 1,
-            0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        MPI_Recv(&overflow, 1, MPI_INT, rank - 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
     }
 
 
     Number answer(right_index - left_index);
 
     switch (overflow) {
-    case 0:
-        answer = without_overflow;
-        overflow = without;
-        break;
-    case 1:
-        answer = with_overflow;
-        overflow = with;
-        break;
+        case 0:
+            answer = without_overflow;
+            overflow = without;
+            break;
+        case 1:
+            answer = with_overflow;
+            overflow = with;
+            break;
     }
 
 
@@ -174,9 +170,9 @@ int main(int argc, char** argv) {
     if (size > 1) {
         if (rank == size - 1) {
             MPI_Send(answer.data(), static_cast<int>(right_index - left_index), MPI_INT, 0, 0, MPI_COMM_WORLD);
-        }
+        } //я не знаю почему, но так быстрее работает
         if (rank == 0) {
-            for (int i = 1; i < size; ++i) {
+            for (int i = 1; i < size; i++) {
                 size_t left = i * (N / size);
                 size_t right = (i != size - 1) ? (i + 1) * (N / size) : N;
                 MPI_Recv(first_number.data() + left, static_cast<int>(right - left), MPI_INT, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
@@ -194,12 +190,12 @@ int main(int argc, char** argv) {
 
 
         result << (first_number.empty() ? 0 : first_number.back());
-        for (int i = static_cast<int>(N - 2); i >= 0; --i) {
+        for (int i = static_cast<int>(N - 2); i >= 0; i--) {
             size_t sizeOfInt = countDigits(first_number[static_cast<size_t>(i)]);
 
             while (sizeOfInt < 9) {
                 result << "0";
-                ++sizeOfInt;
+                sizeOfInt++;
             }
 
             result << first_number[static_cast<size_t>(i)];

@@ -85,7 +85,7 @@ if __name__ == '__main__':
     file_cpy(SCR_FILE, new_name="task5.cpp")
     compile("task5.cpp", COMPILED_FILE_NAME)
 
-    for np in range(1, 5):#29):
+    for np in range(1, 29):
         r = (np, create_and_run_job(7,4, np, n1='number_1.txt', n2='number_2.txt'))
         print(r)
         RESULT.append(r)
