@@ -36,8 +36,7 @@ void alignToCommonSize(Number* number, const size_t N) {
 }
 
 
-int summarize(Number* answer, const Number& first, const Number& second,
-        size_t left, size_t right, size_t overflow) {
+int summarize(Number* answer, const Number& first, const Number& second, size_t left, size_t right, size_t overflow) {
     for (size_t i = 0; i < right - left; ++i) {
         answer->data()[i] = first[left + i] + second[left + i] + overflow;
         if (answer->data()[i] >= MAX_TOKEN) {
@@ -67,8 +66,8 @@ size_t countDigits(size_t n) {
 }
 
 std::string operator*(const std::string& s, unsigned int n) {
-   std::stringstream out;
-    while (n--)
+    std::stringstream out;
+    for (unsigned i = 0; i < n; i++)
         out << s;
     return out.str();
 }
@@ -77,7 +76,6 @@ std::string operator*(unsigned int n, const std::string& s) { return s * n; }
 
 int main(int argc, char** argv) {
     int size, rank;
-    std::ofstream result("result.txt");
     MPI_Init(&argc, &argv);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -92,7 +90,7 @@ int main(int argc, char** argv) {
     std::ifstream first(first_file);
     std::ifstream second(second_file);
 
-    
+    std::ofstream result("result.txt");
 
     if ((!first.is_open()) || (!second.is_open()) ||
             (!result.is_open())) {
@@ -106,12 +104,11 @@ int main(int argc, char** argv) {
     std::getline(first, first_string);
     std::getline(second, second_string);
 
-    Number first_number = convertToNumber(first_string);
-    Number second_number = convertToNumber(second_string);
+    Number first_number = convertToNumber(first_string*2000);
+    Number second_number = convertToNumber(second_string*10);
 
     MPI_Barrier(MPI_COMM_WORLD);
-    size_t N = first_number.size() > second_number.size() ?
-        first_number.size() : second_number.size();
+    size_t N = first_number.size() > second_number.size() ? first_number.size() : second_number.size();
 
 
     alignToCommonSize(&first_number, N);
@@ -120,7 +117,8 @@ int main(int argc, char** argv) {
 
     size_t left_index = rank * (N / size);
     size_t right_index = (rank != size - 1) ? (rank + 1) * (N / size) : N;
-
+	
+    //std::cout << rank << " " << right_index - left_index << "\n";
 
     double start = MPI_Wtime();
 
@@ -173,7 +171,7 @@ int main(int argc, char** argv) {
 
     if (size > 1) {
         if (rank == size - 1) {
-            MPI_Send(answer.data(), static_cast<int>(right_index - left_index), MPI_INT, 0, 0, MPI_COMM_WORLD);
+            MPI_Send(answer.data(), static_cast<int>(right_index - left_index), MPI_INT, 0, 0, MPI_COMM_WORLD); 
         }
         if (rank == 0) {
             for (int i = 1; i < size; ++i) {
@@ -184,34 +182,27 @@ int main(int argc, char** argv) {
         } else {
             MPI_Send(answer.data(), static_cast<int>(right_index - left_index), MPI_INT, 0, 0, MPI_COMM_WORLD);
         }
+        MPI_Finalize();
+        return 0;
     }
 
 
-    if (rank == 0) {
-        if (first_number[N - 1] == 0) {
-            first_number[N - 1] = MAX_TOKEN;
-        }
 
-
-        result << (first_number.empty() ? 0 : first_number.back());
-        for (int i = static_cast<int>(N - 2); i >= 0; --i) {
-            size_t sizeOfInt = countDigits(first_number[static_cast<size_t>(i)]);
-
-            while (sizeOfInt < 9) {
-                result << "0";
-                ++sizeOfInt;
-            }
-
-            result << first_number[static_cast<size_t>(i)];
-        }
-
-
-        result.close();
-
-        std::cout << end << "\n";
-
+    if (first_number[N - 1] == 0) {
+        first_number[N - 1] = MAX_TOKEN;
     }
 
+
+    result << (first_number.empty() ? 0 : first_number.back());
+    for (int i = static_cast<int>(N - 2); i >= 0; --i) {
+        size_t sizeOfInt = countDigits(first_number[static_cast<size_t>(i)]);
+        while (sizeOfInt < 9) {
+            result << "0";
+            ++sizeOfInt;
+        }
+        result << first_number[static_cast<size_t>(i)];
+    }
+    std::cout << end-start << "\n";
     MPI_Finalize();
     return 0;
 }
