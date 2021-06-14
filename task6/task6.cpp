@@ -8,6 +8,7 @@
 
 const unsigned LocalStackSize = 8;
 const double eps = 0.000001;
+const double delta = 0.0000001;
 
 
 struct Job {
@@ -28,8 +29,8 @@ double integrateTrapezoid(double left, double right, double (*func)(double)) {
 std::pair<bool, double> DoJob(Job& job, double (*func)(double)) {
     double res = 0., doubleRes = 0.;
     res = integrateTrapezoid(job.left, job.right, func);
-    doubleRes = integrateTrapezoid(job.left, (job.right-job.left)/2, func) + integrateTrapezoid((job.right-job.left)/2, job.right, func);
-    if (res - doubleRes < eps && res-doubleRes > -eps) {
+    doubleRes = integrateTrapezoid(job.left, (job.right+job.left)/2, func) + integrateTrapezoid((job.right+job.left)/2, job.right, func);
+    if (((res - doubleRes) < eps) && ((res-doubleRes) > -eps) || (job.right - job.left < delta)) {
         return {true, res};
     } else {
         return {false, 0.};
@@ -46,6 +47,8 @@ int main(int argc, char** argv) {
         return 1;
     }
 
+    std::cout << numThreads << "\n";
+
     std::stack<Job> globalStack;
     double h = (right-left)/numThreads;
     int numLazy = 0;
@@ -56,20 +59,35 @@ int main(int argc, char** argv) {
         std::stack<Job> localStack;
         std::queue<Job> queue;
         int threadNum = omp_get_thread_num();
-        localStack.push({threadNum*h, threadNum*(h+1)});
+        localStack.push({threadNum*h, (threadNum+1)*h});
+        bool is_working = true;
         Job currentJob;
         while (1) {
             if (!localStack.empty()) {
                 currentJob = localStack.top();
                 localStack.pop();
+                //std::cout << currentJob.left << " " << currentJob.right << "\n";
                 auto jobResult = DoJob(currentJob, func);
                 if (jobResult.first) {
+                    //std::cout << "OK\n";
                     result += jobResult.second;
                 } else {
-                    double left = currentJob.left;
-                    double right = currentJob.right;
-                    localStack.push({left, (right-left)/2});
-                    queue.push({(right-left)/2, right});
+                    //std::cout << "NO\n";
+                    double lleft = currentJob.left;
+                    double lright = currentJob.right;
+                    localStack.push({lleft, (lright+lleft)/2});
+                    queue.push({(lright+lleft)/2, lright});
+                    if (queue.size() >= LocalStackSize) {
+                        #pragma omp critical
+                        {
+                            Job tmpJob;
+                            while (!queue.empty()) {
+                                tmpJob = queue.front();
+                                queue.pop();
+                                globalStack.push(tmpJob);
+                            }
+                        }
+                    }
                 }
             } else {
                 Job tmpJob;
@@ -77,7 +95,14 @@ int main(int argc, char** argv) {
                 bool needToBreak = false;
                 #pragma omp critical 
                 {
+                    //std::cout << omp_get_thread_num() << "\n";
+                    //std::cout << numLazy << "\n"; 
+                    if (is_working) {
+                        numLazy++;
+                    }
                     if (!globalStack.empty()) {
+                        is_working = true;
+                        numLazy--;
                         for (unsigned i = 0; i < LocalStackSize; i++) {
                             if (!globalStack.empty()) {
                                 tmpJob = globalStack.top();
@@ -92,15 +117,18 @@ int main(int argc, char** argv) {
                             queue.pop();
                             globalStack.push(tmpJob);
                         }
-                        numLazy--;
+                        //std::cout << numLazy << " lazy " << "1d\n";
                     } else if (!queue.empty()) {
+                        is_working = true;
                         needToCheckTheQueue = true;
                         numLazy--;
+                        //std::cout << numLazy << " lazy " << "2d\n";
                     } else if (numLazy == numThreads) {
                         needToBreak = true;
                     } else {
-                        numLazy++;
-                    }                    
+                        //std::cout << "not working\n";
+                        is_working = false;
+                    }            
                 }
 
                 if (needToBreak) {
@@ -116,6 +144,7 @@ int main(int argc, char** argv) {
                 }
             }
         }
+        std::cout << "endloop\n";
     }
 
     std::cout << result << "\n";
