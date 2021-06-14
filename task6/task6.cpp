@@ -6,6 +6,7 @@
 #include <queue>
 #include <math.h>
 
+const unsigned LocalQueueSize = 16;
 const unsigned LocalStackSize = 16;
 const double eps = 0.00001;
 const double delta = 0.000000000001;
@@ -29,18 +30,12 @@ double func2(double arg) {
     return arg;
 }
 
-double integrateTrapezoid(double left, double right, double (*func)(double)) {
-    return (func(left)+func(right))*(right-left)/2;
-}
-
 std::pair<std::pair<bool, double>, std::pair<Job, Job>> DoJob(Job& job, double (*func)(double)) {
-    //std::cout << "kk\n";
     double mid = (job.left+job.right)/2;
     double fmid = func(mid);
     double ileft = (job.fleft+fmid)/2*(mid-job.left);
     double iright = (job.fright+fmid)/2*(job.right-mid);
     double res = ileft + iright;
-    //std::cout << res << " " << job.integral << "\n";
     if (fabs(res-job.integral) > eps*fabs(res)) {
         return {{false, 0.}, {{job.left, mid, job.fleft, fmid, ileft}, {mid, job.right, fmid, job.fright, iright}}};
     } else {
@@ -58,12 +53,11 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    //std::cout << numThreads << "\n";
-
     std::stack<Job> globalStack;
     double h = (b-a)/numThreads;
     int numLazy = 0;
     double result = 0.;
+    double tstart = omp_get_wtime();
 
     #pragma omp parallel num_threads(numThreads) reduction(+: result)
     {
@@ -73,30 +67,30 @@ int main(int argc, char** argv) {
         bool is_working = true;
         Job currentJob;
 
+
         double left = a+threadNum*h;
         double right = a+(threadNum+1)*h;
         double fleft = func(left);
         double fright = func(right);
         double integral = (fleft+fright)/2*(right-left);
         localStack.push({left, right, fleft, fright, integral});
+
+
         while (1) {
             if (!localStack.empty()) {
                 currentJob = localStack.top();
                 localStack.pop();
-                //std::cout << currentJob.left << " " << currentJob.right << "\n";
                 auto jobResult = DoJob(currentJob, func);
-                if (jobResult.first.first) {
-                    //std::cout << "OK\n";
+                if (jobResult.first.first) {;
                     double r = jobResult.first.second;
                     if (isnan(r)) {
                         r = 0.;
                     }
                     result += r;
                 } else {
-                    //std::cout << "NO\n";
                     localStack.push(jobResult.second.first);
                     queue.push(jobResult.second.second);
-                    if (queue.size() >= LocalStackSize) {
+                    if (queue.size() >= LocalQueueSize) {
                         #pragma omp critical
                         {
                             Job tmpJob;
@@ -114,8 +108,6 @@ int main(int argc, char** argv) {
                 bool needToBreak = false;
                 #pragma omp critical 
                 {
-                    //std::cout << omp_get_thread_num() << "\n";
-                    //std::cout << numLazy << "\n"; 
                     if (is_working) {
                         numLazy++;
                     }
@@ -136,16 +128,13 @@ int main(int argc, char** argv) {
                             queue.pop();
                             globalStack.push(tmpJob);
                         }
-                        //std::cout << numLazy << " lazy " << "1d\n";
                     } else if (!queue.empty()) {
                         is_working = true;
                         needToCheckTheQueue = true;
                         numLazy--;
-                       // std::cout << numLazy << " lazy " << "2d\n";
                     } else if (numLazy == numThreads) {
                         needToBreak = true;
                     } else {
-                        //std::cout << "not working\n";
                         is_working = false;
                     }            
                 }
@@ -163,10 +152,10 @@ int main(int argc, char** argv) {
                 }
             }
         }
-        //std::cout << "endloop\n";
     }
 
-    std::cout << result << "\n";
+    //std::cout << result << "\n";
+    std::cout << omp_get_wtime() - tstart << "\n";
 
     return 0;
 }
