@@ -6,56 +6,45 @@
 #include <queue>
 #include <math.h>
 
-const unsigned LocalStackSize = 8;
-const double eps = 0.0001;
+const unsigned LocalStackSize = 16;
+const double eps = 0.00001;
 const double delta = 0.000000000001;
 
 
 struct Job {
     double left;
     double right;
+    double fleft;
+    double fright;
+    double integral;
 };
 
-const double left = 0.0001, right = 1.;
+const double a = 0.0001, b = 1.;
 
 double func(double arg) {
     return sin(1/arg)/arg*sin(1/arg)/arg;
 }
 
 double func2(double arg) {
-    return sin(arg)/arg/arg;
+    return arg;
 }
 
 double integrateTrapezoid(double left, double right, double (*func)(double)) {
     return (func(left)+func(right))*(right-left)/2;
 }
 
-std::pair<bool, double> DoJob(Job& job, double (*func)(double)) {
-    double res = 0., doubleRes = 0., resLeft = 0., resRight = 0.;
-
-    res = integrateTrapezoid(job.left, job.right, func);
-    if (isnan(res)) {
-        res = 0.;
-    }
-
-    resLeft = integrateTrapezoid(job.left, (job.right+job.left)/2, func);
-    if (isnan(resLeft)) {
-        resLeft = 0.;
-    }
-
-    resRight = integrateTrapezoid((job.right+job.left)/2, job.right, func);
-    if (isnan(resRight)) {
-        resRight = 0.;
-    }
-
-    doubleRes =  resLeft + resRight;
-    //if ((job.right - job.left < delta)) {
-    //    return {true, 0.};
-    //}
-    if (fabs(res-doubleRes) < eps) {
-        return {true, res};
+std::pair<std::pair<bool, double>, std::pair<Job, Job>> DoJob(Job& job, double (*func)(double)) {
+    //std::cout << "kk\n";
+    double mid = (job.left+job.right)/2;
+    double fmid = func(mid);
+    double ileft = (job.fleft+fmid)/2*(mid-job.left);
+    double iright = (job.fright+fmid)/2*(job.right-mid);
+    double res = ileft + iright;
+    //std::cout << res << " " << job.integral << "\n";
+    if (fabs(res-job.integral) > eps*fabs(res)) {
+        return {{false, 0.}, {{job.left, mid, job.fleft, fmid, ileft}, {mid, job.right, fmid, job.fright, iright}}};
     } else {
-        return {false, 0.};
+        return {{true, res}, {}};
     }
 }
 
@@ -72,7 +61,7 @@ int main(int argc, char** argv) {
     //std::cout << numThreads << "\n";
 
     std::stack<Job> globalStack;
-    double h = (right-left)/numThreads;
+    double h = (b-a)/numThreads;
     int numLazy = 0;
     double result = 0.;
 
@@ -81,24 +70,32 @@ int main(int argc, char** argv) {
         std::stack<Job> localStack;
         std::queue<Job> queue;
         int threadNum = omp_get_thread_num();
-        localStack.push({threadNum*h, (threadNum+1)*h});
         bool is_working = true;
         Job currentJob;
+
+        double left = a+threadNum*h;
+        double right = a+(threadNum+1)*h;
+        double fleft = func(left);
+        double fright = func(right);
+        double integral = (fleft+fright)/2*(right-left);
+        localStack.push({left, right, fleft, fright, integral});
         while (1) {
             if (!localStack.empty()) {
                 currentJob = localStack.top();
                 localStack.pop();
                 //std::cout << currentJob.left << " " << currentJob.right << "\n";
                 auto jobResult = DoJob(currentJob, func);
-                if (jobResult.first) {
+                if (jobResult.first.first) {
                     //std::cout << "OK\n";
-                    result += jobResult.second;
+                    double r = jobResult.first.second;
+                    if (isnan(r)) {
+                        r = 0.;
+                    }
+                    result += r;
                 } else {
                     //std::cout << "NO\n";
-                    double lleft = currentJob.left;
-                    double lright = currentJob.right;
-                    localStack.push({lleft, (lright+lleft)/2});
-                    queue.push({(lright+lleft)/2, lright});
+                    localStack.push(jobResult.second.first);
+                    queue.push(jobResult.second.second);
                     if (queue.size() >= LocalStackSize) {
                         #pragma omp critical
                         {
@@ -144,7 +141,7 @@ int main(int argc, char** argv) {
                         is_working = true;
                         needToCheckTheQueue = true;
                         numLazy--;
-                        //std::cout << numLazy << " lazy " << "2d\n";
+                       // std::cout << numLazy << " lazy " << "2d\n";
                     } else if (numLazy == numThreads) {
                         needToBreak = true;
                     } else {
