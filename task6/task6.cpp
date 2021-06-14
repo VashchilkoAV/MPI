@@ -6,8 +6,7 @@
 #include <queue>
 #include <math.h>
 
-const unsigned LocalQueueSize = 16;
-const unsigned LocalStackSize = 16;
+
 const double eps = 0.00001;
 const double delta = 0.000000000001;
 
@@ -44,8 +43,15 @@ std::pair<std::pair<bool, double>, std::pair<Job, Job>> DoJob(Job& job, double (
 }
 
 int main(int argc, char** argv) {
+    unsigned long LocalQueueSize = 16;
+    unsigned long LocalStackSize = 16;
     unsigned long numThreads = 1;
-    if (argc > 1) {
+    if (argc > 3) {
+        char *pEnd;
+        numThreads = strtoul(argv[1], &pEnd, 10);
+        LocalStackSize = strtoul(argv[2], &pEnd, 10);
+        LocalQueueSize = strtoul(argv[3], &pEnd, 10);
+    } else if (argc > 1) {
         char *pEnd;
         numThreads = strtoul(argv[1], &pEnd, 10);
     } else {
