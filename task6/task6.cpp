@@ -7,8 +7,8 @@
 #include <math.h>
 
 const unsigned LocalStackSize = 8;
-const double eps = 0.000001;
-const double delta = 0.0000001;
+const double eps = 0.0001;
+const double delta = 0.000000000001;
 
 
 struct Job {
@@ -16,21 +16,43 @@ struct Job {
     double right;
 };
 
-const double left = 0., right = 1.;
+const double left = 0.0001, right = 1.;
 
 double func(double arg) {
-    return 1/arg/arg*sin(1/arg)*sin(1/arg);
+    return sin(1/arg)/arg*sin(1/arg)/arg;
+}
+
+double func2(double arg) {
+    return sin(arg)/arg/arg;
 }
 
 double integrateTrapezoid(double left, double right, double (*func)(double)) {
-    return 0.5*(func(left)+func(right))*(right-left);
+    return (func(left)+func(right))*(right-left)/2;
 }
 
 std::pair<bool, double> DoJob(Job& job, double (*func)(double)) {
-    double res = 0., doubleRes = 0.;
+    double res = 0., doubleRes = 0., resLeft = 0., resRight = 0.;
+
     res = integrateTrapezoid(job.left, job.right, func);
-    doubleRes = integrateTrapezoid(job.left, (job.right+job.left)/2, func) + integrateTrapezoid((job.right+job.left)/2, job.right, func);
-    if (((res - doubleRes) < eps) && ((res-doubleRes) > -eps) || (job.right - job.left < delta)) {
+    if (isnan(res)) {
+        res = 0.;
+    }
+
+    resLeft = integrateTrapezoid(job.left, (job.right+job.left)/2, func);
+    if (isnan(resLeft)) {
+        resLeft = 0.;
+    }
+
+    resRight = integrateTrapezoid((job.right+job.left)/2, job.right, func);
+    if (isnan(resRight)) {
+        resRight = 0.;
+    }
+
+    doubleRes =  resLeft + resRight;
+    //if ((job.right - job.left < delta)) {
+    //    return {true, 0.};
+    //}
+    if (fabs(res-doubleRes) < eps) {
         return {true, res};
     } else {
         return {false, 0.};
@@ -47,7 +69,7 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    std::cout << numThreads << "\n";
+    //std::cout << numThreads << "\n";
 
     std::stack<Job> globalStack;
     double h = (right-left)/numThreads;
@@ -144,7 +166,7 @@ int main(int argc, char** argv) {
                 }
             }
         }
-        std::cout << "endloop\n";
+        //std::cout << "endloop\n";
     }
 
     std::cout << result << "\n";
